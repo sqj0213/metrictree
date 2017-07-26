@@ -1,0 +1,108 @@
+#!/bin/sh
+#
+# metric-tree
+#
+# chkconfig:   - 85 15
+# description:  metric-tree is a free
+# processname: metric-tree
+# config:      /etc/metric-tree/metric-tree.cfg
+# pidfile:     /var/run/metric-tree.pid
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+# Source networking configuration.
+. /etc/sysconfig/network
+
+# Check that networking is up.
+[ "$NETWORKING" = "no" ] && exit 0
+
+exec="/usr/sbin/metric-tree"
+prog=$(basename $exec)
+
+[ -e /etc/sysconfig/$prog ] && . /etc/sysconfig/$prog
+
+lockfile=/var/lock/subsys/metric-tree-write.lock
+
+check() {
+    $exec -c -f /etc/$prog-write.ini
+}
+
+start() {
+    $exec -c -f /etc/$prog-write.ini
+    if [ $? -ne 0 ]; then
+        echo "Errors in configuration file, check with $prog check."
+        return 1
+    fi
+ 
+    echo -n $"Starting $prog: "
+    # start it up here, usually something like "daemon $exec"
+    daemon $exec -f /etc/$prog-write.ini -p /var/run/$prog-write.pid
+    retval=$?
+    echo
+    [ $retval -eq 0 ] && touch $lockfile
+    return $retval
+}
+
+stop() {
+    echo -n $"Stopping $prog: "
+    # stop it here, often "killproc $prog"
+    killproc $prog 
+    retval=$?
+    echo
+    [ $retval -eq 0 ] && rm -f $lockfile
+    return $retval
+}
+
+restart() {
+    $exec -c -f /etc/$prog-write.ini
+    if [ $? -ne 0 ]; then
+        echo "Errors in configuration file, check with $prog-write check."
+        return 1
+    fi
+    stop
+    start
+}
+
+#reload() {
+#    $exec -c -q -f /etc/$prog/$prog.cfg
+#    if [ $? -ne 0 ]; then
+#        echo "Errors in configuration file, check with $prog check."
+#        return 1
+#    fi
+#    echo -n $"Reloading $prog: "
+#    $exec -D -f /etc/$prog/$prog.cfg -p /var/run/$prog.pid -sf $(cat /var/run/$prog.pid)
+#    retval=$?
+#    echo
+#    return $retval
+#}
+
+force_reload() {
+    restart
+}
+
+fdr_status() {
+    status $prog
+}
+
+case "$1" in
+    start|stop|restart)
+        $1
+        ;;
+    force-reload)
+        force_reload
+        ;;
+    check)
+        check
+        ;;
+    status)
+        fdr_status
+        ;;
+    condrestart|try-restart)
+  	[ ! -f $lockfile ] || restart
+	;;
+    *)
+#        echo $"Usage: $0 {start|stop|status|restart|try-restart|reload|force-reload}"
+        echo $"Usage: $0 {start|stop|restart|try-restart|force-reload|check|status}"
+        exit 2
+esac
